@@ -136,6 +136,7 @@ function initializeExtensionFrame() {
     z-index: 999999;
     background: white;
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
   `;
 
   document.body.appendChild(extensionFrame);
