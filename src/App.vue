@@ -20,8 +20,8 @@
           <v-stepper-header class="elevation-0">
             <v-stepper-item
               step="1"
-              :complete="!!eventName"
-              :rules="[() => !!eventName]"
+              :complete="isEventNameValid"
+              :rules="[() => isEventNameValid]"
             >
               Event Name
             </v-stepper-item>
@@ -76,18 +76,36 @@
               <v-text-field
                 v-model="eventName"
                 label="Event Name"
-                placeholder="Enter event name"
+                placeholder="e.g., button_click"
                 outlined
                 dense
-                :hint="!eventName ? 'Start by entering an event name' : ''"
+                :rules="[eventNameRule]"
+                :hint="eventNameHint"
                 persistent-hint
               ></v-text-field>
 
-              <div v-if="selectedElement" class="mt-2">
-                <div class="text-subtitle-2">Event Element:</div>
-                <code class="text-body-2">{{ selectedElement }}</code>
+              <!-- Selected Element Preview -->
+              <div v-if="selectedElement" class="mt-4">
+                <div class="d-flex align-center justify-space-between">
+                  <div class="text-subtitle-2">Selected Element:</div>
+                  <v-btn
+                    color="primary"
+                    text
+                    small
+                    @click="highlightElement"
+                    v-if="selectedElement"
+                  >
+                    Highlight
+                  </v-btn>
+                </div>
+                <v-card outlined class="mt-1 pa-2">
+                  <code class="text-body-2">{{ selectedElement }}</code>
+                </v-card>
               </div>
-              <div v-else-if="eventName" class="mt-2 text-caption text-grey">
+              <div
+                v-else-if="isEventNameValid"
+                class="mt-2 text-caption text-grey"
+              >
                 Hover over and click an element to track
               </div>
             </div>
@@ -109,8 +127,18 @@
               <v-list dense v-if="properties.length > 0" class="property-list">
                 <v-list-item v-for="(prop, index) in properties" :key="index">
                   <v-list-item-content>
-                    <v-list-item-title class="text-subtitle-2">
+                    <v-list-item-title
+                      class="text-subtitle-2 d-flex align-center"
+                    >
                       {{ prop.name }}
+                      <v-btn
+                        icon
+                        x-small
+                        @click="highlightPropertyElement(prop.selector)"
+                        class="ms-2"
+                      >
+                        <v-icon small>mdi-eye</v-icon>
+                      </v-btn>
                     </v-list-item-title>
                     <v-list-item-subtitle class="text-caption">
                       Value: {{ prop.value }}
@@ -119,7 +147,12 @@
                     </v-list-item-subtitle>
                   </v-list-item-content>
                   <v-list-item-action>
-                    <v-btn icon x-small @click="removeProperty(index)">
+                    <v-btn
+                      icon
+                      x-small
+                      @click="removeProperty(index)"
+                      color="error"
+                    >
                       <v-icon small>mdi-delete</v-icon>
                     </v-btn>
                   </v-list-item-action>
@@ -140,14 +173,25 @@
         <!-- Right Column -->
         <div style="width: 50%; height: 100%; overflow-y: auto">
           <div class="pa-4">
-            <div class="text-subtitle-1 mb-2">Generated Script</div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <div class="text-subtitle-1">Generated Script</div>
+              <v-btn
+                v-if="generatedScript"
+                color="primary"
+                small
+                text
+                @click="formatScript"
+              >
+                Format
+              </v-btn>
+            </div>
             <v-card
               outlined
               :color="generatedScript ? 'grey lighten-4' : 'grey lighten-3'"
             >
               <v-card-text class="pa-2">
                 <div v-if="generatedScript">
-                  <pre class="mb-0"><code>{{ generatedScript }}</code></pre>
+                  <pre class="mb-0"><code>{{ formattedScript }}</code></pre>
                 </div>
                 <div v-else class="text-body-2 text-grey text-center py-4">
                   {{ getScriptPlaceholderText }}
@@ -173,7 +217,9 @@
             <v-text-field
               v-model="newPropertyName"
               label="Property Name"
+              :rules="[propertyNameRule]"
               @keyup.enter="startPropertyMapping"
+              placeholder="e.g., button_text"
             ></v-text-field>
           </v-card-text>
           <v-card-actions>
@@ -183,7 +229,7 @@
               color="primary"
               text
               @click="startPropertyMapping"
-              :disabled="!newPropertyName"
+              :disabled="!isPropertyNameValid"
             >
               Select Element
             </v-btn>
@@ -205,10 +251,42 @@ const propertyDialog = ref(false);
 const newPropertyName = ref("");
 const showGuidance = ref(true);
 const currentStep = ref(1);
+const isScriptFormatted = ref(false);
+
+// Validation rules
+const eventNameRule = (value) => {
+  if (!value) return "Event name is required";
+  if (!/^[a-z0-9_]+$/.test(value))
+    return "Use only lowercase letters, numbers, and underscores";
+  return true;
+};
+
+const propertyNameRule = (value) => {
+  if (!value) return "Property name is required";
+  if (!/^[a-z0-9_]+$/.test(value))
+    return "Use only lowercase letters, numbers, and underscores";
+  if (properties.value.some((p) => p.name === value))
+    return "Property name must be unique";
+  return true;
+};
 
 // Computed
+const isEventNameValid = computed(
+  () => eventNameRule(eventName.value) === true
+);
+const isPropertyNameValid = computed(
+  () => propertyNameRule(newPropertyName.value) === true
+);
+
+const eventNameHint = computed(() => {
+  if (!eventName.value) return "Start by entering an event name";
+  return eventNameRule(eventName.value) === true
+    ? ""
+    : eventNameRule(eventName.value);
+});
+
 const generatedScript = computed(() => {
-  if (!selectedElement.value || !eventName.value) return "";
+  if (!selectedElement.value || !isEventNameValid.value) return "";
 
   const propertiesObj = properties.value.reduce((acc, prop) => {
     acc[
@@ -231,6 +309,13 @@ ${propertiesString}
 });`;
 });
 
+const formattedScript = computed(() => {
+  if (!generatedScript.value) return "";
+  return isScriptFormatted.value
+    ? formatJavaScript(generatedScript.value)
+    : generatedScript.value;
+});
+
 const contentHeight = computed(() => {
   const baseHeight = "300px";
   const headerHeight = "49px";
@@ -239,7 +324,7 @@ const contentHeight = computed(() => {
 });
 
 const getScriptPlaceholderText = computed(() => {
-  if (!eventName.value) return "Start by adding an event name";
+  if (!isEventNameValid.value) return "Enter a valid event name";
   if (!selectedElement.value) return "Select an element to track";
   if (properties.value.length === 0)
     return "Add properties to enhance your tracking";
@@ -247,6 +332,38 @@ const getScriptPlaceholderText = computed(() => {
 });
 
 // Methods
+const formatJavaScript = (code) => {
+  // Simple formatter - you could use a library like prettier if needed
+  return code
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n");
+};
+
+const formatScript = () => {
+  isScriptFormatted.value = !isScriptFormatted.value;
+};
+
+const highlightElement = () => {
+  window.parent.postMessage(
+    {
+      type: "HIGHLIGHT_ELEMENT",
+      selector: selectedElement.value,
+    },
+    "*"
+  );
+};
+
+const highlightPropertyElement = (selector) => {
+  window.parent.postMessage(
+    {
+      type: "HIGHLIGHT_ELEMENT",
+      selector,
+    },
+    "*"
+  );
+};
+
 const close = () => {
   window.parent.postMessage(
     {
@@ -263,7 +380,7 @@ const closePropertyDialog = () => {
 };
 
 const startPropertyMapping = () => {
-  if (newPropertyName.value) {
+  if (isPropertyNameValid.value) {
     propertyDialog.value = false;
     window.parent.postMessage(
       {
@@ -330,7 +447,7 @@ onMounted(() => {
 
 // Step handling
 const updateCurrentStep = () => {
-  if (!eventName.value) {
+  if (!isEventNameValid.value) {
     currentStep.value = 1;
   } else if (!selectedElement.value) {
     currentStep.value = 2;
