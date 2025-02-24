@@ -1,9 +1,9 @@
-// src/content.js
+// content.js
 let extensionFrame = null;
 let currentHighlight = null;
 let isSelecting = false;
+let selectionMode = "event"; // 'event' or 'property'
 
-// Helper function to get unique selector for an element
 function getUniqueSelector(element) {
   if (element.id) {
     return `#${element.id}`;
@@ -22,18 +22,17 @@ function getUniqueSelector(element) {
   return path.join(" > ");
 }
 
-// Mouse move handler for highlighting
 function handleMouseMove(e) {
   if (!isSelecting) return;
-
-  // Remove previous highlight
-  if (currentHighlight) {
-    currentHighlight.classList.remove("event-tracker-highlight");
-  }
 
   // Don't highlight the extension frame or its children
   if (e.target === extensionFrame || extensionFrame?.contains(e.target)) {
     return;
+  }
+
+  // Remove previous highlight
+  if (currentHighlight) {
+    currentHighlight.classList.remove("event-tracker-highlight");
   }
 
   // Add highlight to current element
@@ -52,7 +51,6 @@ function handleMouseMove(e) {
   }
 }
 
-// Click handler for element selection
 function handleClick(e) {
   if (!isSelecting) return;
 
@@ -63,19 +61,31 @@ function handleClick(e) {
     return;
   }
 
-  // Send selected element to extension
-  if (extensionFrame?.contentWindow) {
-    extensionFrame.contentWindow.postMessage(
+  const selector = getUniqueSelector(e.target);
+  const value = e.target.textContent.trim();
+
+  if (selectionMode === "event") {
+    extensionFrame?.contentWindow.postMessage(
       {
         type: "ELEMENT_SELECTED",
-        selector: getUniqueSelector(e.target),
+        selector: selector,
       },
       "*"
     );
+  } else if (selectionMode === "property") {
+    extensionFrame?.contentWindow.postMessage(
+      {
+        type: "PROPERTY_VALUE",
+        selector: selector,
+        value: value,
+      },
+      "*"
+    );
+    // Reset back to event mode after property selection
+    selectionMode = "event";
   }
 }
 
-// Listen for messages from the app
 window.addEventListener("message", (event) => {
   if (event.source !== extensionFrame?.contentWindow) return;
 
@@ -83,6 +93,7 @@ window.addEventListener("message", (event) => {
     case "TOGGLE_TRACKER":
       if (event.data.active) {
         isSelecting = true;
+        selectionMode = "event";
         document.addEventListener("mousemove", handleMouseMove);
         document.addEventListener("click", handleClick, true);
       } else {
@@ -102,11 +113,11 @@ window.addEventListener("message", (event) => {
 
     case "START_PROPERTY_MAPPING":
       isSelecting = true;
+      selectionMode = "property";
       break;
   }
 });
 
-// Function to initialize the extension frame
 function initializeExtensionFrame() {
   if (extensionFrame) {
     extensionFrame.remove();
@@ -130,7 +141,6 @@ function initializeExtensionFrame() {
   document.body.appendChild(extensionFrame);
 }
 
-// Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "OPEN_TRACKER") {
     initializeExtensionFrame();
