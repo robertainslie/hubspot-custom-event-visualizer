@@ -105,6 +105,9 @@ window.addEventListener("message", (event) => {
           currentHighlight = null;
         }
         if (extensionFrame) {
+          // Restore original padding
+          document.body.style.paddingBottom =
+            extensionFrame.dataset.originalPadding || "";
           extensionFrame.remove();
           extensionFrame = null;
         }
@@ -156,7 +159,7 @@ function initializeExtensionFrame() {
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 300px;
+    height: 350px;
     border: none;
     z-index: 999999;
     background: white;
@@ -165,6 +168,15 @@ function initializeExtensionFrame() {
   `;
 
   document.body.appendChild(extensionFrame);
+
+  // Add padding to body to prevent content from being hidden
+  const originalBodyPadding = window.getComputedStyle(
+    document.body
+  ).paddingBottom;
+  document.body.style.paddingBottom = "350px";
+
+  // Store original padding to restore it when extension is closed
+  extensionFrame.dataset.originalPadding = originalBodyPadding;
 }
 
 chrome.runtime.onMessage.addListener((message) => {

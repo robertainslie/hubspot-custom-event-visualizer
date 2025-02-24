@@ -1,18 +1,66 @@
 <template>
-  <v-app style="height: 300px">
+  <v-app style="height: 350px">
     <v-card class="fill-height">
-      <!-- Fixed Header -->
-      <v-card-title class="d-flex justify-space-between py-2">
-        Event Tracker
-        <v-btn icon @click="close">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </v-card-title>
+      <!-- Compact Header -->
+      <div class="d-flex justify-space-between align-center px-4 py-1">
+        <span class="text-subtitle-2">Event Tracker</span>
+        <v-btn
+          icon="mdi-close"
+          size="small"
+          variant="text"
+          @click="close"
+        ></v-btn>
+      </div>
 
       <v-divider></v-divider>
 
+      <!-- Vuetify Stepper -->
+      <div class="px-4 pt-1">
+        <v-stepper v-model="currentStep" class="elevation-0">
+          <v-stepper-header class="elevation-0">
+            <v-stepper-item
+              step="1"
+              :complete="!!eventName"
+              :rules="[() => !!eventName]"
+            >
+              Event Name
+            </v-stepper-item>
+
+            <v-divider></v-divider>
+
+            <v-stepper-item
+              step="2"
+              :complete="!!selectedElement"
+              :rules="[() => !!selectedElement]"
+            >
+              Select Element
+            </v-stepper-item>
+
+            <v-divider></v-divider>
+
+            <v-stepper-item
+              step="3"
+              :complete="properties.length > 0"
+              :rules="[() => properties.length > 0]"
+            >
+              Add Properties
+            </v-stepper-item>
+
+            <v-divider></v-divider>
+
+            <v-stepper-item
+              step="4"
+              :complete="!!generatedScript"
+              :rules="[() => !!generatedScript]"
+            >
+              Copy Script
+            </v-stepper-item>
+          </v-stepper-header>
+        </v-stepper>
+      </div>
+
       <!-- Scrollable Content Area -->
-      <div style="height: calc(300px - 49px); display: flex">
+      <div :style="{ height: contentHeight, display: 'flex' }">
         <!-- Left Column -->
         <div
           style="
@@ -31,11 +79,16 @@
                 placeholder="Enter event name"
                 outlined
                 dense
+                :hint="!eventName ? 'Start by entering an event name' : ''"
+                persistent-hint
               ></v-text-field>
 
               <div v-if="selectedElement" class="mt-2">
                 <div class="text-subtitle-2">Event Element:</div>
                 <code class="text-body-2">{{ selectedElement }}</code>
+              </div>
+              <div v-else-if="eventName" class="mt-2 text-caption text-grey">
+                Hover over and click an element to track
               </div>
             </div>
 
@@ -74,7 +127,11 @@
               </v-list>
 
               <div v-else class="text-body-2 text-grey">
-                No properties added yet
+                {{
+                  selectedElement
+                    ? "Add properties to track additional values"
+                    : "Select an element first to add properties"
+                }}
               </div>
             </div>
           </div>
@@ -93,7 +150,7 @@
                   <pre class="mb-0"><code>{{ generatedScript }}</code></pre>
                 </div>
                 <div v-else class="text-body-2 text-grey text-center py-4">
-                  Select an element and add an event name to generate the script
+                  {{ getScriptPlaceholderText }}
                 </div>
               </v-card-text>
               <v-divider v-if="generatedScript"></v-divider>
@@ -138,7 +195,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 
 // State
 const eventName = ref("");
@@ -146,6 +203,8 @@ const selectedElement = ref(null);
 const properties = ref([]);
 const propertyDialog = ref(false);
 const newPropertyName = ref("");
+const showGuidance = ref(true);
+const currentStep = ref(1);
 
 // Computed
 const generatedScript = computed(() => {
@@ -170,6 +229,21 @@ ${propertiesString}
     }
   }]);
 });`;
+});
+
+const contentHeight = computed(() => {
+  const baseHeight = "300px";
+  const headerHeight = "49px";
+  const stepperHeight = showGuidance.value ? "72px" : "0px";
+  return `calc(${baseHeight} - ${headerHeight} - ${stepperHeight})`;
+});
+
+const getScriptPlaceholderText = computed(() => {
+  if (!eventName.value) return "Start by adding an event name";
+  if (!selectedElement.value) return "Select an element to track";
+  if (properties.value.length === 0)
+    return "Add properties to enhance your tracking";
+  return "Your script will appear here";
 });
 
 // Methods
@@ -220,6 +294,7 @@ onMounted(() => {
   const handleMessage = (event) => {
     if (event.data.type === "ELEMENT_SELECTED") {
       selectedElement.value = event.data.selector;
+      updateCurrentStep();
     } else if (event.data.type === "PROPERTY_VALUE") {
       properties.value.push({
         name: newPropertyName.value,
@@ -227,9 +302,11 @@ onMounted(() => {
         selector: event.data.selector,
       });
       newPropertyName.value = "";
+      updateCurrentStep();
     } else if (event.data.type === "COPY_COMPLETE") {
       if (event.data.success) {
         alert("Script copied to clipboard!");
+        currentStep.value = 4;
       }
     }
   };
@@ -250,6 +327,22 @@ onMounted(() => {
     window.removeEventListener("message", handleMessage);
   };
 });
+
+// Step handling
+const updateCurrentStep = () => {
+  if (!eventName.value) {
+    currentStep.value = 1;
+  } else if (!selectedElement.value) {
+    currentStep.value = 2;
+  } else if (properties.value.length === 0) {
+    currentStep.value = 3;
+  } else {
+    currentStep.value = 4;
+  }
+};
+
+// Watch for step changes
+watch(eventName, () => updateCurrentStep());
 </script>
 
 <style>
@@ -274,5 +367,20 @@ pre {
 code {
   font-family: monospace;
   font-size: 0.9em;
+}
+
+:deep(.v-stepper) {
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+:deep(.v-stepper-header) {
+  box-shadow: none !important;
+  height: auto !important;
+  padding: 8px 0 !important;
+}
+
+:deep(.v-stepper-item) {
+  font-size: 0.875rem !important;
 }
 </style>
