@@ -1,0 +1,24 @@
+.highlight-element {
+    outline: 2px solid orange !important;
+    cursor: pointer !important;
+  }
+  .event-tracker-highlight {
+    outline: 2px solid orange !important;
+    outline-offset: 2px !important;
+    cursor: pointer !important;
+  }
+  
+  .event-tracker-selected {
+    outline: 2px solid green !important;
+    outline-offset: 2px !important;
+  }
+  
+  #event-tracker-app {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999999;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  }
