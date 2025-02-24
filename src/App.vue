@@ -206,10 +206,13 @@ const removeProperty = (index) => {
 };
 
 const copyScript = () => {
-  navigator.clipboard
-    .writeText(generatedScript.value)
-    .then(() => alert("Script copied to clipboard!"))
-    .catch((err) => console.error("Failed to copy script:", err));
+  window.parent.postMessage(
+    {
+      type: "COPY_TO_CLIPBOARD",
+      text: generatedScript.value,
+    },
+    "*"
+  );
 };
 
 // Message handling
@@ -224,6 +227,10 @@ onMounted(() => {
         selector: event.data.selector,
       });
       newPropertyName.value = "";
+    } else if (event.data.type === "COPY_COMPLETE") {
+      if (event.data.success) {
+        alert("Script copied to clipboard!");
+      }
     }
   };
 

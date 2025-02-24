@@ -115,6 +115,31 @@ window.addEventListener("message", (event) => {
       isSelecting = true;
       selectionMode = "property";
       break;
+
+    case "COPY_TO_CLIPBOARD":
+      // Create a temporary textarea element
+      const textarea = document.createElement("textarea");
+      textarea.value = event.data.text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+
+      // Select and copy the text
+      textarea.select();
+      document.execCommand("copy");
+
+      // Clean up
+      document.body.removeChild(textarea);
+
+      // Send confirmation back to iframe
+      extensionFrame.contentWindow.postMessage(
+        {
+          type: "COPY_COMPLETE",
+          success: true,
+        },
+        "*"
+      );
+      break;
   }
 });
 
