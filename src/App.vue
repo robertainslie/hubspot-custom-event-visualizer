@@ -129,8 +129,8 @@
             <div class="mb-4">
               <v-text-field
                 v-model="eventName"
-                label="Event Name"
-                placeholder="e.g., button_click"
+                label="HubSpot Custom Event Name"
+                placeholder="e.g., pe123456_cart_interaction "
                 outlined
                 dense
                 :rules="[eventNameRule]"
