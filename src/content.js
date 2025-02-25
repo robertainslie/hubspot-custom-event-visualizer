@@ -291,7 +291,7 @@ function initializeExtensionFrame() {
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 350px;
+    height: 400px;
     border: none;
     z-index: 999999;
     background: white;

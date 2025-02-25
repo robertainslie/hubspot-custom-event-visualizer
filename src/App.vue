@@ -1,39 +1,47 @@
 <template>
-  <v-app style="height: 350px">
+  <v-app style="height: 400px">
     <v-card class="fill-height">
-      <!-- Compact Header -->
-      <div class="d-flex justify-space-between align-center px-4 py-1">
-        <span class="text-subtitle-2">Event Tracker</span>
+      <!-- Header with HubSpot Orange Background -->
+      <div
+        class="d-flex justify-space-between align-center px-4 py-2"
+        style="background-color: #ff7a59; color: white"
+      >
+        <span class="text-h5">HubSpot Custom Event Visualization Tracker</span>
         <v-btn
           icon="mdi-close"
           size="small"
           variant="text"
+          color="white"
           @click="close"
         ></v-btn>
       </div>
 
       <v-divider></v-divider>
 
-      <!-- Vuetify Stepper -->
-      <div class="px-4 pt-1">
+      <!-- Vuetify Stepper with Auto-Highlighting -->
+      <div class="px-4 pt-2">
         <v-stepper v-model="currentStep" class="elevation-0">
           <v-stepper-header class="elevation-0">
             <v-stepper-item
               step="1"
-              :complete="isEventNameValid"
-              :rules="[() => isEventNameValid]"
+              :complete="!!selectedElement"
+              :rules="[() => !!selectedElement]"
+              class="step-item"
+              :class="{ 'current-step': currentStep === 1 }"
             >
-              Event Name
+              <span>1. Hover & Click to Select an Element to Click Track</span>
             </v-stepper-item>
 
             <v-divider></v-divider>
 
             <v-stepper-item
               step="2"
-              :complete="!!selectedElement"
-              :rules="[() => !!selectedElement]"
+              :complete="isEventNameValid"
+              :rules="[() => isEventNameValid]"
+              class="step-item"
+              :class="{ 'current-step': currentStep === 2 }"
             >
-              Select Element
+              <span>2. Add HubSpot Internal Event Name</span>
             </v-stepper-item>
 
             <v-divider></v-divider>
@@ -42,8 +50,19 @@
               step="3"
               :complete="properties.length > 0"
               :rules="[() => properties.length > 0]"
+              class="step-item"
+              :class="{ 'current-step': currentStep === 3 }"
             >
-              Add Properties
+              <div>
+                <span
+                  >3. Add Event Property Names Then Click Elements to Capture
+                  Values</span
+                >
+                <div v-if="selectedElement" class="text-caption">
+                  when Element: <code>{{ selectedElementShort }}</code> is
+                  clicked
+                </div>
+              </div>
             </v-stepper-item>
 
             <v-divider></v-divider>
@@ -52,8 +71,10 @@
               step="4"
               :complete="!!generatedScript"
               :rules="[() => !!generatedScript]"
+              class="step-item"
+              :class="{ 'current-step': currentStep === 4 }"
             >
-              Copy Script
+              <span>4. Copy Script & Paste in HubSpot Custom JS Event</span>
             </v-stepper-item>
           </v-stepper-header>
         </v-stepper>
@@ -71,6 +92,46 @@
           "
         >
           <div class="pa-4">
+            <!-- Current Step Indicator -->
+            <div class="mb-3 step-indicator">
+              <v-chip
+                color="#FF7A59"
+                text-color="white"
+                class="font-weight-medium"
+                >Step {{ currentStep }}: {{ currentStepTitle }}</v-chip
+              >
+            </div>
+
+            <!-- Selected Element Preview -->
+            <div v-if="selectedElement" class="mb-4">
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-subtitle-2">Selected Element:</div>
+                <v-btn
+                  color="#FF7A59"
+                  text
+                  small
+                  @click="highlightElement"
+                  v-if="selectedElement"
+                >
+                  Highlight Selected Element
+                </v-btn>
+              </div>
+              <v-card outlined class="mt-1 pa-2">
+                <code class="text-body-2">{{ selectedElement }}</code>
+              </v-card>
+            </div>
+            <div v-else class="mb-4 element-instruction">
+              <v-alert
+                type="info"
+                density="compact"
+                variant="tonal"
+                color="#FF7A59"
+              >
+                Hover over elements on the page and click to select one for
+                tracking
+              </v-alert>
+            </div>
+
             <!-- Event Configuration -->
             <div class="mb-4">
               <v-text-field
@@ -82,32 +143,9 @@
                 :rules="[eventNameRule]"
                 :hint="eventNameHint"
                 persistent-hint
+                :disabled="!selectedElement"
+                @input="checkAndAdvanceStep"
               ></v-text-field>
-
-              <!-- Selected Element Preview -->
-              <div v-if="selectedElement" class="mt-4">
-                <div class="d-flex align-center justify-space-between">
-                  <div class="text-subtitle-2">Selected Element:</div>
-                  <v-btn
-                    color="primary"
-                    text
-                    small
-                    @click="highlightElement"
-                    v-if="selectedElement"
-                  >
-                    Highlight
-                  </v-btn>
-                </div>
-                <v-card outlined class="mt-1 pa-2">
-                  <code class="text-body-2">{{ selectedElement }}</code>
-                </v-card>
-              </div>
-              <div
-                v-else-if="isEventNameValid"
-                class="mt-2 text-caption text-grey"
-              >
-                Hover over and click an element to track
-              </div>
             </div>
 
             <!-- Property Configuration -->
@@ -115,55 +153,70 @@
               <div class="d-flex align-center justify-space-between mb-2">
                 <div class="text-subtitle-1">Properties</div>
                 <v-btn
-                  color="primary"
+                  color="#FF7A59"
                   @click="propertyDialog = true"
-                  :disabled="!selectedElement"
+                  :disabled="!selectedElement || !isEventNameValid"
                   small
                 >
                   Add Property
                 </v-btn>
               </div>
 
-              <v-list dense v-if="properties.length > 0" class="property-list">
-                <v-list-item v-for="(prop, index) in properties" :key="index">
-                  <v-list-item-content>
-                    <v-list-item-title
-                      class="text-subtitle-2 d-flex align-center"
-                    >
-                      {{ prop.name }}
+              <v-table
+                v-if="properties.length > 0"
+                class="property-table"
+                density="compact"
+              >
+                <thead>
+                  <tr>
+                    <th>Property Name</th>
+                    <th>Sample Value</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(prop, index) in properties" :key="index">
+                    <td class="property-name">{{ prop.name }}</td>
+                    <td class="property-value">
+                      <div class="text-truncate">{{ prop.value }}</div>
+                      <div class="text-caption text-grey">
+                        <code>{{ getShortenedSelector(prop.selector) }}</code>
+                      </div>
+                    </td>
+                    <td class="property-actions">
                       <v-btn
                         icon
-                        x-small
+                        density="comfortable"
+                        size="small"
+                        variant="text"
+                        color="#FF7A59"
                         @click="highlightPropertyElement(prop.selector)"
-                        class="ms-2"
+                        class="mr-1"
                       >
-                        <v-icon small>mdi-eye</v-icon>
+                        <v-icon>mdi-eye</v-icon>
                       </v-btn>
-                    </v-list-item-title>
-                    <v-list-item-subtitle class="text-caption">
-                      Value: {{ prop.value }}
-                      <br />
-                      Selector: <code>{{ prop.selector }}</code>
-                    </v-list-item-subtitle>
-                  </v-list-item-content>
-                  <v-list-item-action>
-                    <v-btn
-                      icon
-                      x-small
-                      @click="removeProperty(index)"
-                      color="error"
-                    >
-                      <v-icon small>mdi-delete</v-icon>
-                    </v-btn>
-                  </v-list-item-action>
-                </v-list-item>
-              </v-list>
+                      <v-btn
+                        icon
+                        density="comfortable"
+                        size="small"
+                        variant="text"
+                        color="error"
+                        @click="removeProperty(index)"
+                      >
+                        <v-icon>mdi-delete</v-icon>
+                      </v-btn>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-table>
 
               <div v-else class="text-body-2 text-grey">
                 {{
-                  selectedElement
+                  selectedElement && isEventNameValid
                     ? "Add properties to track additional values"
-                    : "Select an element first to add properties"
+                    : selectedElement
+                    ? "Enter an event name first to add properties"
+                    : "Select an element first"
                 }}
               </div>
             </div>
@@ -175,20 +228,29 @@
           <div class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
               <div class="text-subtitle-1">Generated Script</div>
-              <v-btn
-                v-if="generatedScript"
-                color="primary"
-                small
-                text
-                @click="formatScript"
-              >
-                Format
-              </v-btn>
+              <div>
+                <v-btn
+                  v-if="generatedScript"
+                  color="#FF7A59"
+                  small
+                  text
+                  class="mr-2"
+                  @click="formatScript"
+                >
+                  {{ isScriptFormatted ? "Unformat" : "Format" }}
+                </v-btn>
+                <v-btn
+                  v-if="generatedScript"
+                  color="#FF7A59"
+                  small
+                  text
+                  @click="copyScript"
+                >
+                  Copy Script
+                </v-btn>
+              </div>
             </div>
-            <v-card
-              outlined
-              :color="generatedScript ? 'grey lighten-4' : 'grey lighten-3'"
-            >
+            <v-card outlined :color="generatedScript ? '#213343' : '#213343'">
               <v-card-text class="pa-2">
                 <div v-if="generatedScript">
                   <pre class="mb-0"><code>{{ formattedScript }}</code></pre>
@@ -200,10 +262,33 @@
               <v-divider v-if="generatedScript"></v-divider>
               <v-card-actions v-if="generatedScript" class="pa-2">
                 <v-spacer></v-spacer>
-                <v-btn color="primary" small @click="copyScript">
-                  Copy Script
+                <v-btn
+                  color="#FF7A59"
+                  text-color="white"
+                  small
+                  :style="{ backgroundColor: '#FF7A59' }"
+                  @click="copyScript"
+                >
+                  Copy Script to Clipboard
                 </v-btn>
               </v-card-actions>
+            </v-card>
+
+            <!-- Instructions for current step -->
+            <v-card
+              v-if="currentStepInstructions"
+              class="mt-4"
+              variant="outlined"
+            >
+              <v-card-title class="text-subtitle-1">
+                <v-icon class="mr-2" color="#FF7A59"
+                  >mdi-information-outline</v-icon
+                >
+                {{ currentStepTitle }}
+              </v-card-title>
+              <v-card-text class="text-body-2">
+                {{ currentStepInstructions }}
+              </v-card-text>
             </v-card>
           </div>
         </div>
@@ -212,22 +297,24 @@
       <!-- Property Dialog -->
       <v-dialog v-model="propertyDialog" max-width="500px">
         <v-card>
-          <v-card-title>Add Property</v-card-title>
-          <v-card-text>
+          <v-card-title style="background-color: #ff7a59; color: white">
+            Add Custom Event Internal Property Name
+          </v-card-title>
+          <v-card-text class="pt-4">
             <v-text-field
               v-model="newPropertyName"
-              label="Property Name"
+              label="Custom Event Property Name"
               :rules="[propertyNameRule]"
               @keyup.enter="startPropertyMapping"
-              placeholder="e.g., button_text"
+              placeholder="e.g., product_name"
             ></v-text-field>
           </v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
             <v-btn text @click="closePropertyDialog">Cancel</v-btn>
             <v-btn
-              color="primary"
-              text
+              color="#FF7A59"
+              text-color="white"
               @click="startPropertyMapping"
               :disabled="!isPropertyNameValid"
             >
@@ -279,7 +366,8 @@ const isPropertyNameValid = computed(
 );
 
 const eventNameHint = computed(() => {
-  if (!eventName.value) return "Start by entering an event name";
+  if (!selectedElement.value) return "Select an element first";
+  if (!eventName.value) return "Enter an event name";
   return eventNameRule(eventName.value) === true
     ? ""
     : eventNameRule(eventName.value);
@@ -319,16 +407,60 @@ const formattedScript = computed(() => {
 const contentHeight = computed(() => {
   const baseHeight = "300px";
   const headerHeight = "49px";
-  const stepperHeight = showGuidance.value ? "72px" : "0px";
+  const stepperHeight = showGuidance.value ? "90px" : "0px";
   return `calc(${baseHeight} - ${headerHeight} - ${stepperHeight})`;
 });
 
 const getScriptPlaceholderText = computed(() => {
-  if (!isEventNameValid.value) return "Enter a valid event name";
   if (!selectedElement.value) return "Select an element to track";
+  if (!isEventNameValid.value) return "Enter a valid event name";
   if (properties.value.length === 0)
     return "Add properties to enhance your tracking";
   return "Your script will appear here";
+});
+
+const selectedElementShort = computed(() => {
+  if (!selectedElement.value) return "";
+  // Get shortened version of the selector for display in step 3
+  return selectedElement.value.length > 40
+    ? selectedElement.value.substring(0, 37) + "..."
+    : selectedElement.value;
+});
+
+// Helper function to shorten selectors for display
+const getShortenedSelector = (selector) => {
+  if (!selector) return "";
+  return selector.length > 30 ? selector.substring(0, 27) + "..." : selector;
+};
+
+const currentStepTitle = computed(() => {
+  switch (currentStep.value) {
+    case 1:
+      return "Select Element";
+    case 2:
+      return "Add Event Name";
+    case 3:
+      return "Add Properties";
+    case 4:
+      return "Copy Script";
+    default:
+      return "";
+  }
+});
+
+const currentStepInstructions = computed(() => {
+  switch (currentStep.value) {
+    case 1:
+      return "Hover over elements on the webpage and click on the one you want to track. The element will be highlighted with an orange outline as you hover.";
+    case 2:
+      return "Enter a name for this tracking event. Use only lowercase letters, numbers, and underscores. This will be the event name in HubSpot analytics.";
+    case 3:
+      return "Add properties to capture additional information when the tracked element is clicked. Properties can be values from other elements on the page.";
+    case 4:
+      return "Your script is ready! Copy it to your clipboard and paste it into a HubSpot Custom HTML or JavaScript section.";
+    default:
+      return "";
+  }
 });
 
 // Methods
@@ -394,6 +526,7 @@ const startPropertyMapping = () => {
 
 const removeProperty = (index) => {
   properties.value.splice(index, 1);
+  updateCurrentStep();
 };
 
 const copyScript = () => {
@@ -406,12 +539,30 @@ const copyScript = () => {
   );
 };
 
+const checkAndAdvanceStep = () => {
+  // Check if the current field is valid and automatically advance to the next step
+  if (currentStep.value === 1 && selectedElement.value) {
+    currentStep.value = 2;
+  } else if (currentStep.value === 2 && isEventNameValid.value) {
+    currentStep.value = 3;
+  }
+
+  updateCurrentStep();
+};
+
 // Message handling
 onMounted(() => {
   const handleMessage = (event) => {
     if (event.data.type === "ELEMENT_SELECTED") {
       selectedElement.value = event.data.selector;
       updateCurrentStep();
+
+      // Automatically advance to the next step when element is selected
+      if (currentStep.value === 1) {
+        setTimeout(() => {
+          currentStep.value = 2;
+        }, 500);
+      }
     } else if (event.data.type === "PROPERTY_VALUE") {
       properties.value.push({
         name: newPropertyName.value,
@@ -447,9 +598,9 @@ onMounted(() => {
 
 // Step handling
 const updateCurrentStep = () => {
-  if (!isEventNameValid.value) {
+  if (!selectedElement.value) {
     currentStep.value = 1;
-  } else if (!selectedElement.value) {
+  } else if (!isEventNameValid.value) {
     currentStep.value = 2;
   } else if (properties.value.length === 0) {
     currentStep.value = 3;
@@ -471,8 +622,23 @@ body {
 </style>
 
 <style scoped>
-.property-list {
+.property-table {
   border: none !important;
+}
+
+.property-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.property-value {
+  max-width: 200px;
+  overflow: hidden;
+}
+
+.property-actions {
+  white-space: nowrap;
+  width: 90px;
 }
 
 pre {
@@ -499,5 +665,25 @@ code {
 
 :deep(.v-stepper-item) {
   font-size: 0.875rem !important;
+}
+
+/* Highlight current step */
+.current-step {
+  background-color: rgba(255, 122, 89, 0.1) !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
+}
+
+.current-step :deep(.v-stepper-item__label) {
+  color: #ff7a59 !important;
+}
+
+.step-indicator {
+  margin-bottom: 16px;
+}
+
+.element-instruction {
+  border-left: 4px solid #ff7a59;
+  padding-left: 12px;
 }
 </style>
