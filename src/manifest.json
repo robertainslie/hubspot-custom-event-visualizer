@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Event Tracker",
+  "name": "Unofficial HubSpot Custom Event Visualizer (Supporting Event Properties)",
   "version": "1.0",
-  "description": "Track and visualize page elements for event tracking",
+  "description": "A utility to help you visually track a web page element, attach a click listener, and then populate custom event properties with other page values.",
   "permissions": ["activeTab", "scripting"],
   "action": {
     "default_icon": {

@@ -1,5 +1,5 @@
 <template>
-  <v-app style="height: 400px">
+  <v-app style="height: 400px; overflow: hidden">
     <v-card class="fill-height">
       <!-- Header with HubSpot Orange Background -->
       <div
@@ -80,17 +80,10 @@
         </v-stepper>
       </div>
 
-      <!-- Scrollable Content Area -->
-      <div :style="{ height: contentHeight, display: 'flex' }">
+      <!-- Scrollable Content Area with Fixed Height -->
+      <div class="columns-container">
         <!-- Left Column -->
-        <div
-          style="
-            width: 50%;
-            height: 100%;
-            overflow-y: auto;
-            border-right: 1px solid rgba(0, 0, 0, 0.12);
-          "
-        >
+        <div class="column left-column">
           <div class="pa-4">
             <!-- Current Step Indicator -->
             <div class="mb-3 step-indicator">
@@ -224,7 +217,7 @@
         </div>
 
         <!-- Right Column -->
-        <div style="width: 50%; height: 100%; overflow-y: auto">
+        <div class="column right-column">
           <div class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
               <div class="text-subtitle-1">Generated Script</div>
@@ -250,10 +243,12 @@
                 </v-btn>
               </div>
             </div>
-            <v-card outlined :color="generatedScript ? '#213343' : '#213343'">
-              <v-card-text class="pa-2">
+            <v-card outlined :color="'#213343'" class="script-card">
+              <v-card-text class="pa-2" :style="{ color: 'white' }">
                 <div v-if="generatedScript">
-                  <pre class="mb-0"><code>{{ formattedScript }}</code></pre>
+                  <pre
+                    class="mb-0"
+                  ><code style="color: white">{{ formattedScript }}</code></pre>
                 </div>
                 <div v-else class="text-body-2 text-grey text-center py-4">
                   {{ getScriptPlaceholderText }}
@@ -388,7 +383,7 @@ const generatedScript = computed(() => {
     .join(",\n");
 
   return `document.querySelector('${selectedElement.value}').addEventListener('click', function() {
-  _hsq.push(['trackCustomEvent', {
+  _hsq.push(['trackCustomBehavioralEvent', {
     eventName: '${eventName.value}',
     properties: {
 ${propertiesString}
@@ -402,13 +397,6 @@ const formattedScript = computed(() => {
   return isScriptFormatted.value
     ? formatJavaScript(generatedScript.value)
     : generatedScript.value;
-});
-
-const contentHeight = computed(() => {
-  const baseHeight = "300px";
-  const headerHeight = "49px";
-  const stepperHeight = showGuidance.value ? "90px" : "0px";
-  return `calc(${baseHeight} - ${headerHeight} - ${stepperHeight})`;
 });
 
 const getScriptPlaceholderText = computed(() => {
@@ -622,6 +610,57 @@ body {
 </style>
 
 <style scoped>
+/* Fixed height container for Chrome extension iframe */
+.v-application {
+  overflow: hidden;
+}
+
+/* Column layout with fixed height and independent scrolling */
+.columns-container {
+  display: flex;
+  height: 235px; /* Fixed height for the content area */
+  overflow: hidden;
+}
+
+.column {
+  width: 50%;
+  height: 100%;
+  overflow-y: auto; /* Each column scrolls independently */
+  overflow-x: hidden;
+}
+
+.left-column {
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Custom scrollbar for better UX */
+.column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.column::-webkit-scrollbar-track {
+  background-color: #f1f1f1;
+}
+
+.column::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 3px;
+}
+
+.column::-webkit-scrollbar-thumb:hover {
+  background-color: #aaa;
+}
+
+/* Script card */
+.script-card {
+  background-color: #213343;
+}
+
+.script-card code {
+  color: white;
+}
+
+/* Property table */
 .property-table {
   border: none !important;
 }
